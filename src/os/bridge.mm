@@ -1,4 +1,5 @@
-#include "platform.hpp"
+#include "bridge.h"
+
 #import <Cocoa/Cocoa.h>
 #import <QuartzCore/CAMetalLayer.h>
 #import <Metal/Metal.h>
@@ -27,7 +28,8 @@ static bool          g_quit    = false;
 }
 @end
 
-void* platform_create_window(int w, int h, const char* title) {
+void* create_chart_window(int w, int h, const char* title)
+{
     [NSApplication sharedApplication];
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
 
@@ -65,15 +67,18 @@ void* platform_create_window(int w, int h, const char* title) {
     return (__bridge void*)g_layer;
 }
 
-void* platform_next_drawable() {
+void* get_next_drawable()
+{
     return (__bridge void*)[g_layer nextDrawable];
 }
 
-void* platform_get_device() {
+void* get_rendering_device()
+{
     return (__bridge void*)g_layer.device;
 }
 
-void platform_poll_events() {
+void poll_application_events()
+{
     NSEvent* e;
     while ((e = [NSApp nextEventMatchingMask:NSEventMaskAny
                                    untilDate:nil
@@ -82,6 +87,7 @@ void platform_poll_events() {
         [NSApp sendEvent:e];
 }
 
-bool platform_should_quit() {
+bool application_should_quit()
+{
     return g_quit;
 }

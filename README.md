@@ -1,7 +1,7 @@
 # MetalCppApp
 
 A minimal macOS application using **C++** and **Apple's Metal-cpp** headers.  
-The only Objective-C file is `src/platform.mm` (~60 lines) — everything else is pure C++.
+The only Objective-C file is `src/os/bridge.mm` (~60 lines) — everything else is pure C++.
 
 ## What it does
 
@@ -15,13 +15,6 @@ MetalCppApp/
 ├── README.md
 ├── metal-cpp/            ← you place the Apple headers here (see below)
 └── src/
-    ├── main.cpp          ← pure C++: app entry + run loop
-    ├── renderer.hpp      ← pure C++: renderer interface
-    ├── renderer.cpp      ← pure C++: all Metal-cpp calls
-    ├── metal_impl.cpp    ← pure C++: Metal-cpp private implementations
-    ├── platform.hpp      ← pure C  : platform abstraction interface
-    ├── platform.mm       ← Obj-C   : NSWindow + CAMetalLayer (~60 lines)
-    └── shaders.metal     ← MSL     : vertex + fragment shaders
 ```
 
 ## Prerequisites
@@ -65,7 +58,7 @@ cmake --build build
 
 | File | Role |
 |---|---|
-| `metal_impl.cpp` | Defines `NS/CA/MTL_PRIVATE_IMPLEMENTATION` — include in exactly one TU |
-| `platform.mm` | The only ObjC: creates `NSWindow` + `CAMetalLayer`, polls `NSApp` events |
+| `os/metal.cpp` | Defines `NS/CA/MTL_PRIVATE_IMPLEMENTATION` — include in exactly one TU |
+| `os/bridge.mm` | The only ObjC: creates `NSWindow` + `CAMetalLayer`, polls `NSApp` events |
 | `renderer.cpp` | Full Metal-cpp renderer: pipeline, buffers, render loop |
 | `shaders.metal` | MSL shaders compiled to `default.metallib` at build time |

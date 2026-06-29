@@ -1,11 +1,15 @@
-#include "renderer.hpp"
+#include "renderer.h"
 
-#include <Metal/Metal.hpp>
-#include <QuartzCore/QuartzCore.hpp>
-#include <Foundation/Foundation.hpp>
+#include "os/bridge.h"
+#include "os/metal.h"
 
-#include <stdexcept>
 #include <dispatch/dispatch.h>
+
+#include <cstring>
+#include <format>
+#include <stdexcept>
+
+namespace space307 {
 
 // ---------------------------------------------------------------------------
 // Vertex layout (must match shaders.metal)
@@ -28,7 +32,8 @@ struct Uniforms {
 // ---------------------------------------------------------------------------
 static const int kMaxFramesInFlight = 3;
 
-struct Renderer::Impl {
+struct Renderer::Impl
+{
     MTL::Device*              device        = nullptr;
     MTL::CommandQueue*        commandQueue  = nullptr;
     MTL::RenderPipelineState* pipeline      = nullptr;
@@ -44,8 +49,9 @@ struct Renderer::Impl {
 // ---------------------------------------------------------------------------
 // Constructor
 // ---------------------------------------------------------------------------
-Renderer::Renderer(void* metalDevice) : _impl(new Impl()) {
-    _impl->device = reinterpret_cast<MTL::Device*>(metalDevice);
+Renderer::Renderer(void* metalDevice) : _impl(std::make_unique<Impl>())
+{
+    _impl->device = static_cast<MTL::Device*>(metalDevice);
     _impl->commandQueue = _impl->device->newCommandQueue();
     _impl->frameSemaphore = dispatch_semaphore_create(kMaxFramesInFlight);
 
@@ -58,9 +64,9 @@ Renderer::Renderer(void* metalDevice) : _impl(new Impl()) {
         NS::URL::fileURLWithPath(libPath), &error);
 
     if (!library) {
-        throw std::runtime_error(
-            std::string("Failed to load default.metallib: ") +
-            error->localizedDescription()->utf8String());
+        throw std::runtime_error(std::format(
+            "Failed to load default.metallib: {}",
+            error->localizedDescription()->utf8String()));
     }
 
     MTL::Function* vertFn = library->newFunction(
@@ -72,14 +78,16 @@ Renderer::Renderer(void* metalDevice) : _impl(new Impl()) {
     auto* vtxDesc = MTL::VertexDescriptor::alloc()->init();
 
     // position (attribute 0)
-    vtxDesc->attributes()->object(0)->setFormat(MTL::VertexFormatFloat3);
-    vtxDesc->attributes()->object(0)->setOffset(offsetof(Vertex, position));
-    vtxDesc->attributes()->object(0)->setBufferIndex(0);
+    auto* obj = vtxDesc->attributes()->object(0);
+    obj->setFormat(MTL::VertexFormatFloat3);
+    obj->setOffset(offsetof(Vertex, position));
+    obj->setBufferIndex(0);
 
     // color (attribute 1)
-    vtxDesc->attributes()->object(1)->setFormat(MTL::VertexFormatFloat4);
-    vtxDesc->attributes()->object(1)->setOffset(offsetof(Vertex, color));
-    vtxDesc->attributes()->object(1)->setBufferIndex(0);
+    obj = vtxDesc->attributes()->object(1);
+    obj->setFormat(MTL::VertexFormatFloat4);
+    obj->setOffset(offsetof(Vertex, color));
+    obj->setBufferIndex(0);
 
     vtxDesc->layouts()->object(0)->setStride(sizeof(Vertex));
 
@@ -93,9 +101,8 @@ Renderer::Renderer(void* metalDevice) : _impl(new Impl()) {
 
     _impl->pipeline = _impl->device->newRenderPipelineState(pipelineDesc, &error);
     if (!_impl->pipeline) {
-        throw std::runtime_error(
-            std::string("Pipeline error: ") +
-            error->localizedDescription()->utf8String());
+        throw std::runtime_error(std::format(
+            "Pipeline error: {}", error->localizedDescription()->utf8String()));
     }
 
     pipelineDesc->release();
@@ -123,24 +130,26 @@ Renderer::Renderer(void* metalDevice) : _impl(new Impl()) {
 // ---------------------------------------------------------------------------
 // Destructor
 // ---------------------------------------------------------------------------
-Renderer::~Renderer() {
+Renderer::~Renderer()
+{
     _impl->vertexBuffer->release();
     for (int i = 0; i < kMaxFramesInFlight; i++)
         _impl->uniformBuffers[i]->release();
     _impl->pipeline->release();
     _impl->commandQueue->release();
-    delete _impl;
 }
 
-void Renderer::resize(float /*width*/, float /*height*/) {
+void Renderer::resize(float /*width*/, float /*height*/)
+{
     // Update projection matrix here if needed
 }
 
 // ---------------------------------------------------------------------------
 // Per-frame draw
 // ---------------------------------------------------------------------------
-void Renderer::draw(void* nextDrawable) {
-    auto* drawable = reinterpret_cast<CA::MetalDrawable*>(nextDrawable);
+void Renderer::draw(void* nextDrawable)
+{
+    auto* drawable = static_cast<CA::MetalDrawable*>(nextDrawable);
     if (!drawable) return;
 
     dispatch_semaphore_wait(_impl->frameSemaphore, DISPATCH_TIME_FOREVER);
@@ -150,15 +159,15 @@ void Renderer::draw(void* nextDrawable) {
 
     // Update uniforms
     Uniforms uniforms { _impl->time };
-    memcpy(_impl->uniformBuffers[idx]->contents(), &uniforms, sizeof(uniforms));
+    std::memcpy(_impl->uniformBuffers[idx]->contents(), &uniforms, sizeof(uniforms));
 
     // Render pass descriptor
     auto* passDesc = MTL::RenderPassDescriptor::alloc()->init();
-    passDesc->colorAttachments()->object(0)->setTexture(drawable->texture());
-    passDesc->colorAttachments()->object(0)->setLoadAction(MTL::LoadActionClear);
-    passDesc->colorAttachments()->object(0)->setStoreAction(MTL::StoreActionStore);
-    passDesc->colorAttachments()->object(0)
-        ->setClearColor(MTL::ClearColor(0.08, 0.08, 0.12, 1.0));
+    auto* obj = passDesc->colorAttachments()->object(0);
+    obj->setTexture(drawable->texture());
+    obj->setLoadAction(MTL::LoadActionClear);
+    obj->setStoreAction(MTL::StoreActionStore);
+    obj->setClearColor(MTL::ClearColor(0.08, 0.08, 0.12, 1.0));
 
     auto* cmdBuf  = _impl->commandQueue->commandBuffer();
     auto* encoder = cmdBuf->renderCommandEncoder(passDesc);
@@ -172,8 +181,7 @@ void Renderer::draw(void* nextDrawable) {
     cmdBuf->presentDrawable(drawable);
 
     // Signal semaphore once GPU finishes this frame
-    dispatch_semaphore_t sem = _impl->frameSemaphore;
-    cmdBuf->addCompletedHandler([sem](MTL::CommandBuffer*) {
+    cmdBuf->addCompletedHandler([sem = _impl->frameSemaphore](MTL::CommandBuffer*) {
         dispatch_semaphore_signal(sem);
     });
 
@@ -182,3 +190,16 @@ void Renderer::draw(void* nextDrawable) {
 
     _impl->frameIndex = (idx + 1) % kMaxFramesInFlight;
 }
+
+void Renderer::mainLoop()
+{
+    while (!application_should_quit())
+    {
+        poll_application_events();
+
+        void* drawable = get_next_drawable();
+        draw(drawable);
+    }
+}
+
+} // namespace

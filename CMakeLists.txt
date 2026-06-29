@@ -58,12 +58,9 @@ add_custom_command(
 # ---------------------------------------------------------------------------
 # Executable
 # ---------------------------------------------------------------------------
-add_executable(MetalCppApp MACOSX_BUNDLE
-    src/main.cpp
-    src/metal_impl.cpp
-    src/renderer.cpp
-    src/platform.mm
-)
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.cpp)
+
+add_executable(MetalCppApp MACOSX_BUNDLE ${SOURCES} src/os/bridge.mm)
 
 add_dependencies(MetalCppApp Shaders)
 
